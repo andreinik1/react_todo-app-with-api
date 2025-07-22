@@ -25,6 +25,7 @@ export const App: React.FC = () => {
   const [error, setError] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const headerInputRef = useRef<HTMLInputElement>(null);
+  const [allCompleted, setAllCompleted] = useState<boolean>(false);
   const [tempTodo, setTempTodo] = useState<Omit<Todo, 'id'> | null>(
     {} as Omit<Todo, 'id'>,
   );
@@ -37,6 +38,11 @@ export const App: React.FC = () => {
         setLeftItems(
           fetchedTodos.filter(todoToCount => !todoToCount.completed).length,
         );
+
+        const areAllCompleted =
+          fetchedTodos.length > 0 && fetchedTodos.every(todo => todo.completed);
+
+        setAllCompleted(areAllCompleted);
       })
       .catch(() => {
         setError('Unable to load todos');
@@ -45,6 +51,16 @@ export const App: React.FC = () => {
         }, 3000);
       });
   }, []);
+
+  useEffect(() => {
+    if (todos.length > 0) {
+      const areAllCompleted = todos.every(todo => todo.completed);
+
+      setAllCompleted(areAllCompleted);
+    } else {
+      setAllCompleted(false);
+    }
+  }, [todos]);
 
   useEffect(() => {
     setFilteredTodos(todos);
@@ -91,6 +107,10 @@ export const App: React.FC = () => {
           setCurrentCreatedTodo={setCurrentCreatedTodo}
           setTodos={setTodos}
           setError={setError}
+          todos={todos}
+          allCompleted={allCompleted}
+          setAllCompleted={setAllCompleted}
+          setTodoStatus={setTodoStatus}
         />
 
         <TodoList

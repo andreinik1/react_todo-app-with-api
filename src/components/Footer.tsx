@@ -51,29 +51,41 @@ export const Footer: React.FC<Props> = ({
         type="button"
         className="todoapp__clear-completed"
         data-cy="ClearCompletedButton"
+        disabled={!todos.some(todo => todo.completed)}
         onClick={() => {
-          todos.map(todoItem => {
-            if (todoItem.completed) {
-              todosApi
-                .deleteTodo(todoItem.id)
-                .then(() => {
-                  setTodos(
-                    todos.filter(
-                      filteredTodoItem => !filteredTodoItem.completed,
-                    ),
-                  );
-                })
-                .catch(() => {
-                  setError('Unable to delete a todo');
-                  setTimeout(() => {
-                    setError('');
-                  }, 3000);
-                });
+          const completedTodos = todos.filter(todo => todo.completed);
+          const deletePromises = completedTodos.map(todo =>
+            todosApi
+              .deleteTodo(todo.id)
+              .then(() => ({ id: todo.id, success: true }))
+              .catch(() => ({ id: todo.id, success: false })),
+          );
+
+          Promise.all(deletePromises).then(results => {
+            const failedIds = results
+              .filter(result => !result.success)
+              .map(result => result.id);
+
+            const updatedTodos = todos.filter(todo => {
+              if (todo.completed && !failedIds.includes(todo.id)) {
+                return false;
+              }
+
+              return true;
+            });
+
+            setTodos(updatedTodos);
+
+            if (failedIds.length > 0) {
+              setError('Unable to delete a todo');
+              setTimeout(() => {
+                setError('');
+              }, 3000);
             }
           });
         }}
       >
-        {leftItems < todos.length && 'Clear completed'}
+        {todos.some(todo => todo.completed) && 'Clear completed'}
       </button>
     </footer>
   );

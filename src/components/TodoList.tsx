@@ -36,21 +36,43 @@ export const TodoList: React.FC<Props> = ({
   todoLoaderId,
   setTodoLoaderId,
 }) => {
-  const handleToBlur = (currentTodoItem: Todo) => {
-    setEdditingTodo(undefined);
+  const handleToggleTodoStatus = (todo: Todo) => {
+    setTodoStatus(true);
+    setTodoLoaderId(todo.id);
     todosApi
-      .updateTodo(
-        currentTodoItem.id,
-        currentTodoItem.completed,
-        edditingTodoTitle,
-      )
+      .updateTodo(todo.id, !todo.completed, todo.title)
       .then(updatedTodo => {
         setTodoStatus(true);
+        setTodos(prevTodos =>
+          prevTodos.map(t => (t.id === updatedTodo.id ? updatedTodo : t)),
+        );
+        setTodoStatus(false);
+        setTodoLoaderId(0);
+      })
+      .finally(() => {
+        setTodoStatus(false);
+      });
+  };
+
+  const handleToBlur = (currentTodoItem: Todo) => {
+    setTodoStatus(true);
+    setTodoLoaderId(currentTodoItem.id);
+
+    const trimmedTitle = edditingTodoTitle.trim();
+
+    todosApi
+      .updateTodo(currentTodoItem.id, currentTodoItem.completed, trimmedTitle)
+      .then(updatedTodo => {
         const newTodos = [...todos];
         const index = newTodos.findIndex(todoo => todoo.id === updatedTodo.id);
 
         newTodos.splice(index, 1, updatedTodo);
         setTodos(newTodos);
+
+        setEdditingTodoTitle(trimmedTitle);
+        setEdditingTodo(undefined);
+        setTodoStatus(false);
+        setTodoLoaderId(0);
 
         return newTodos;
       })
@@ -59,6 +81,8 @@ export const TodoList: React.FC<Props> = ({
         setTimeout(() => {
           setError('');
         }, 3000);
+        setTodoStatus(false);
+        setTodoLoaderId(0);
       })
       .finally(() => {
         setTodoStatus(false);
@@ -79,25 +103,7 @@ export const TodoList: React.FC<Props> = ({
               type="checkbox"
               className="todo__status"
               checked={todoToMap.completed}
-              onChange={() => {
-                todosApi
-                  .updateTodo(
-                    todoToMap.id,
-                    !todoToMap.completed,
-                    todoToMap.title,
-                  )
-                  .then(updatedTodo => {
-                    setTodoStatus(true);
-                    setTodos(prevTodos => {
-                      return prevTodos.map(todoItem =>
-                        todoItem.id === updatedTodo.id ? updatedTodo : todoItem,
-                      );
-                    });
-                  })
-                  .finally(() => {
-                    setTodoStatus(false);
-                  });
-              }}
+              onChange={() => handleToggleTodoStatus(todoToMap)}
             />
           </label>
 
@@ -115,41 +121,55 @@ export const TodoList: React.FC<Props> = ({
                 placeholder="Empty todo w`ill be deleted"
                 value={edditingTodoTitle}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    handleToBlur(todoToMap);
-                  } else if (e.key === 'Enter') {
-                    setTodoStatus(true);
-                    setTodoLoaderId(todoToMap.id);
+                  if (e.key === 'Enter') {
+                    const trimmedTitle = e.currentTarget.value.trim();
 
-                    todosApi
-                      .deleteTodo(todoToMap.id)
-                      .then(() => {
-                        setTodoStatus(false);
-                        setTodos(prevTodos =>
-                          prevTodos.filter(
-                            todoItem => todoItem.id !== todoToMap.id,
-                          ),
-                        );
-                      })
-                      .catch(() => {
-                        setError('Unable to delete a todo');
-                        setFilteredTodos(todos);
-                        setTimeout(() => {
-                          setError('');
+                    if (trimmedTitle === todoToMap.title) {
+                      setEdditingTodo(undefined);
+                      setEdditingTodoTitle('');
+                    } else if (trimmedTitle) {
+                      handleToBlur(todoToMap);
+                    } else {
+                      setTodoStatus(true);
+                      setTodoLoaderId(todoToMap.id);
+                      todosApi
+                        .deleteTodo(todoToMap.id)
+                        .then(() => {
                           setTodoStatus(false);
-                        }, 3000);
-                      });
+                          setTodos(prevTodos =>
+                            prevTodos.filter(
+                              todoItem => todoItem.id !== todoToMap.id,
+                            ),
+                          );
+                        })
+                        .catch(() => {
+                          setError('Unable to delete a todo');
+                          setFilteredTodos(todos);
+                          setTimeout(() => {
+                            setError('');
+                            setTodoStatus(false);
+                          }, 3000);
+                        });
+                    }
+                  } else if (e.key === 'Escape') {
+                    setEdditingTodo(undefined);
+                    setEdditingTodoTitle(todoToMap.title);
                   }
                 }}
                 onChange={e => {
                   setEdditingTodoTitle(e.currentTarget.value);
                 }}
                 onBlur={() => {
-                  handleToBlur(todoToMap);
-                  if (edditingTodoTitle.trim() === '') {
+                  const trimmedTitle = edditingTodoTitle.trim();
+
+                  if (trimmedTitle === todoToMap.title) {
+                    setEdditingTodo(undefined);
+                    setEdditingTodoTitle('');
+                  } else if (trimmedTitle) {
+                    handleToBlur(todoToMap);
+                  } else {
                     setTodoStatus(true);
                     setTodoLoaderId(todoToMap.id);
-
                     todosApi
                       .deleteTodo(todoToMap.id)
                       .then(() => {
@@ -220,7 +240,15 @@ export const TodoList: React.FC<Props> = ({
 
           <div
             data-cy="TodoLoader"
-            className={`modal overlay ${todoStatus && todoLoaderId === todoToMap.id ? 'is-active' : ''}`}
+            className={`modal overlay ${
+              (
+                todoLoaderId
+                  ? todoStatus && todoLoaderId === todoToMap.id
+                  : todoStatus
+              )
+                ? 'is-active'
+                : ''
+            }`}
           >
             <div className="modal-background has-background-white-ter" />
             <div className="loader" />
