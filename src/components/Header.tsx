@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import classNames from 'classnames';
 import { USER_ID } from '.././api/todos';
 import * as todosApi from '../api/todos';
 import { Todo } from '../types/Todo';
@@ -41,10 +42,12 @@ export const Header: React.FC<Props> = ({
   };
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+    const trimmedValue = e.currentTarget.value.trim();
+
+    if (e.key === 'Enter' && trimmedValue) {
       const newTodo: Omit<Todo, 'id'> = {
         userId: USER_ID,
-        title: e.currentTarget.value.trim(),
+        title: trimmedValue,
         completed: false,
       };
 
@@ -95,15 +98,13 @@ export const Header: React.FC<Props> = ({
       {todos.length > 0 && (
         <button
           type="button"
-          className={`
-    todoapp__toggle-all
-    ${!allCompleted ? '' : 'active'}
-    ${todos.length === 0 ? 'hidden' : ''}
-  `}
+          className={classNames('todoapp__toggle-all', {
+            active: allCompleted,
+            hidden: todos.length === 0,
+          })}
           data-cy="ToggleAllButton"
           onClick={() => {
             setTodoStatus(true);
-
             const newCompleted = !allCompleted;
 
             const todosToUpdate = todos.filter(

@@ -1,17 +1,31 @@
 import React from 'react';
+import classNames from 'classnames';
 import { Todo } from '../types/Todo';
 import * as todosApi from '../api/todos';
+import { FilterType } from '../types/FilterType';
 
-const FILTERS = [
-  { label: 'All', value: '', cy: 'FilterLinkAll' },
-  { label: 'Active', value: 'active', cy: 'FilterLinkActive' },
-  { label: 'Completed', value: 'completed', cy: 'FilterLinkCompleted' },
+export const FILTERS = [
+  {
+    label: 'All',
+    value: FilterType.All,
+    cy: 'FilterLinkAll',
+  },
+  {
+    label: 'Active',
+    value: FilterType.Active,
+    cy: 'FilterLinkActive',
+  },
+  {
+    label: 'Completed',
+    value: FilterType.Completed,
+    cy: 'FilterLinkCompleted',
+  },
 ];
 
 type Props = {
   leftItems: number;
-  query: string;
-  setQuery: (query: string) => void;
+  query: FilterType;
+  setQuery: React.Dispatch<React.SetStateAction<FilterType>>;
   todos: Todo[];
   setTodos: (todos: Todo[]) => void;
   setError: (error: string) => void;
@@ -25,67 +39,69 @@ export const Footer: React.FC<Props> = ({
   setTodos,
   setError,
 }) => {
+  const hasCompleted = todos.some(todo => todo.completed);
+
+  const handleClearCompleted = () => {
+    const completedTodos = todos.filter(todo => todo.completed);
+
+    const deletePromises = completedTodos.map(todo =>
+      todosApi
+        .deleteTodo(todo.id)
+        .then(() => ({ id: todo.id, success: true }))
+        .catch(() => ({ id: todo.id, success: false })),
+    );
+
+    Promise.all(deletePromises).then(results => {
+      const failedIds = results
+        .filter(result => !result.success)
+        .map(result => result.id);
+
+      const updatedTodos = todos.filter(
+        todo => !(todo.completed && !failedIds.includes(todo.id)),
+      );
+
+      setTodos(updatedTodos);
+
+      if (failedIds.length > 0) {
+        setError('Unable to delete a todo');
+        setTimeout(() => setError(''), 3000);
+      }
+    });
+  };
+
   return (
     <footer className="todoapp__footer" data-cy="Footer">
       <span className="todo-count" data-cy="TodosCounter">
         {leftItems} items left
       </span>
 
-      {/* Active link should have the 'selected' class */}
       <nav className="filter" data-cy="Filter">
         {FILTERS.map(({ label, value, cy }) => (
           <a
             key={value}
             href={`#/${value}`}
-            className={`filter__link ${query === value ? 'selected' : ''}`}
+            className={classNames('filter__link', {
+              selected: query === value,
+            })}
             data-cy={cy}
-            onClick={() => setQuery(value)}
+            onClick={event => {
+              event.preventDefault();
+              setQuery(value);
+            }}
           >
             {label}
           </a>
         ))}
       </nav>
 
-      {/* this button should be disabled if there are no completed todos */}
       <button
         type="button"
         className="todoapp__clear-completed"
         data-cy="ClearCompletedButton"
-        disabled={!todos.some(todo => todo.completed)}
-        onClick={() => {
-          const completedTodos = todos.filter(todo => todo.completed);
-          const deletePromises = completedTodos.map(todo =>
-            todosApi
-              .deleteTodo(todo.id)
-              .then(() => ({ id: todo.id, success: true }))
-              .catch(() => ({ id: todo.id, success: false })),
-          );
-
-          Promise.all(deletePromises).then(results => {
-            const failedIds = results
-              .filter(result => !result.success)
-              .map(result => result.id);
-
-            const updatedTodos = todos.filter(todo => {
-              if (todo.completed && !failedIds.includes(todo.id)) {
-                return false;
-              }
-
-              return true;
-            });
-
-            setTodos(updatedTodos);
-
-            if (failedIds.length > 0) {
-              setError('Unable to delete a todo');
-              setTimeout(() => {
-                setError('');
-              }, 3000);
-            }
-          });
-        }}
+        disabled={!hasCompleted}
+        onClick={handleClearCompleted}
       >
-        {todos.some(todo => todo.completed) && 'Clear completed'}
+        {hasCompleted && 'Clear completed'}
       </button>
     </footer>
   );
